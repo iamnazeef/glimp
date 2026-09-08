@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Glimp - Quick Camera",
+  "version": "1.0.0",
+  "description": "Hold a keyboard shortcut to open a smooth camera preview on top of any page.",
+  "permissions": ["activeTab", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_end",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["permission.html", "icon.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "action": {
+    "default_title": "Glimp Camera",
+    "default_icon": "icon.png"
+  }
+}
