@@ -19,7 +19,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["permission.html", "icon.png"],
+      "resources": ["permission.html", "camera-frame.html", "icon.png"],
       "matches": ["<all_urls>"]
     }
   ],

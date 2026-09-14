@@ -6,15 +6,20 @@
   const VIDEO_ID = 'glimp-camera-video';
   const PLACEHOLDER_ID = 'glimp-camera-placeholder';
   const SHUTTER_ID = 'glimp-camera-shutter';
+  const EXTENSION_ORIGIN = chrome.runtime.getURL('').replace(/\/$/, '');
 
   let wrapper = null;
   let video = null;
   let placeholder = null;
   let shutter = null;
   let isVisible = false;
-  let stream = null;
   let stopTimeout = null;
   let permissionDenied = false;
+
+  let channel = null;
+  let frameReady = false;
+  let pendingStart = false;
+  let cameraActive = false;
 
   function isLKey(event) {
     return event.code === 'KeyL' || (event.key && event.key.toLowerCase() === 'l');
@@ -44,11 +49,16 @@
     wrapper.setAttribute('role', 'dialog');
     wrapper.setAttribute('aria-label', 'Camera preview');
 
-    video = document.createElement('video');
+    // The camera lives in an extension-origin iframe (not a <video> fed by a
+    // page-scoped getUserMedia call) so the permission grant is tied to this
+    // extension's own origin and persists across every site instead of
+    // re-prompting per site.
+    video = document.createElement('iframe');
     video.id = VIDEO_ID;
-    video.autoplay = true;
-    video.playsInline = true;
-    video.muted = true;
+    video.setAttribute('allow', 'camera');
+    video.setAttribute('frameborder', '0');
+    video.addEventListener('load', initFrameChannel, { once: true });
+    video.src = chrome.runtime.getURL('camera-frame.html');
 
     placeholder = document.createElement('div');
     placeholder.id = PLACEHOLDER_ID;
@@ -70,34 +80,59 @@
     }
   }
 
-  async function startCamera() {
-    if (stream) return;
+  function initFrameChannel() {
+    channel = new MessageChannel();
+    channel.port1.onmessage = handleFrameMessage;
+    frameReady = true;
+    video.contentWindow.postMessage({ type: 'GLIMP_INIT' }, EXTENSION_ORIGIN, [channel.port2]);
 
-    try {
-      if (!window.isSecureContext) {
-        throw new Error('Insecure context');
-      }
-      stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      video.srcObject = stream;
-      video.classList.add('glimp-active');
+    if (pendingStart) {
+      pendingStart = false;
+      sendStart();
+    }
+  }
+
+  function handleFrameMessage(event) {
+    const data = event.data;
+    if (!data) return;
+
+    if (data.type === 'GLIMP_STARTED') {
+      cameraActive = true;
       permissionDenied = false;
-    } catch (err) {
-      console.error('Glimp camera error:', err);
+      if (video) video.classList.add('glimp-active');
+    } else if (data.type === 'GLIMP_ERROR') {
+      cameraActive = false;
+      console.error('Glimp camera error:', data.message);
       if (!permissionDenied) {
         permissionDenied = true;
         openPermissionPage();
       }
       hideOverlay(true);
+    } else if (data.type === 'GLIMP_CAPTURED') {
+      downloadCapture(data.dataUrl);
     }
   }
 
-  function stopCamera() {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      stream = null;
+  function sendStart() {
+    if (!channel) return;
+    channel.port1.postMessage({ type: 'GLIMP_START' });
+  }
+
+  function startCamera() {
+    if (cameraActive) return;
+    if (!frameReady) {
+      pendingStart = true;
+      return;
     }
+    sendStart();
+  }
+
+  function stopCamera() {
+    if (channel && cameraActive) {
+      channel.port1.postMessage({ type: 'GLIMP_STOP' });
+    }
+    cameraActive = false;
     if (video) {
-      video.srcObject = null;
       video.classList.remove('glimp-active');
     }
   }
@@ -136,24 +171,17 @@
   }
 
   function captureImage() {
-    if (!stream || !video || !video.videoWidth || !video.videoHeight) return;
+    if (!cameraActive || !channel) return;
 
     triggerShutter();
     playCaptureSound();
+    channel.port1.postMessage({ type: 'GLIMP_CAPTURE' });
+  }
 
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
+  function downloadCapture(dataUrl) {
+    if (!dataUrl) return;
 
-    // Mirror the captured image to match the on-screen preview.
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const dataUrl = canvas.toDataURL('image/png');
     const filename = `glimp-${Date.now()}.png`;
-
     const link = document.createElement('a');
     link.href = dataUrl;
     link.download = filename;
