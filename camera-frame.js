@@ -2,6 +2,8 @@
   const video = document.getElementById('frame-video');
   let stream = null;
   let port = null;
+  let stopRequested = false;
+  let starting = false;
 
   function reply(message) {
     if (!port) return;
@@ -13,18 +15,38 @@
       reply({ type: 'GLIMP_STARTED' });
       return;
     }
+    // A getUserMedia negotiation is already in flight (e.g. the prewarm on
+    // Cmd/Ctrl+Shift, followed moments later by the real start on L) — let
+    // that one finish rather than opening a second, independent stream that
+    // nothing would ever stop.
+    if (starting) return;
 
+    starting = true;
+    stopRequested = false;
     try {
       // The preview is only ever shown at 320x240 CSS px, so ask for a small
       // format instead of letting the camera negotiate its own (often higher,
       // slower to initialize) default.
-      stream = await navigator.mediaDevices.getUserMedia({
+      const acquired = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 480 } },
       });
+
+      // A stop can arrive while getUserMedia was still negotiating (e.g. the
+      // prewarm was cancelled). Tear it straight back down instead of
+      // letting the camera turn on after the user already backed out.
+      if (stopRequested) {
+        stopRequested = false;
+        acquired.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      stream = acquired;
       video.srcObject = stream;
       reply({ type: 'GLIMP_STARTED' });
     } catch (err) {
       reply({ type: 'GLIMP_ERROR', message: err && err.message });
+    } finally {
+      starting = false;
     }
   }
 
@@ -32,8 +54,10 @@
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
       stream = null;
+      video.srcObject = null;
+    } else {
+      stopRequested = true;
     }
-    video.srcObject = null;
   }
 
   function captureFrame() {

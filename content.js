@@ -20,6 +20,7 @@
   let frameReady = false;
   let pendingStart = false;
   let cameraActive = false;
+  let modifiersPrewarmed = false;
 
   function isLKey(event) {
     return event.code === 'KeyL' || (event.key && event.key.toLowerCase() === 'l');
@@ -128,7 +129,7 @@
   }
 
   function stopCamera() {
-    if (channel && cameraActive) {
+    if (channel) {
       channel.port1.postMessage({ type: 'GLIMP_STOP' });
     }
     cameraActive = false;
@@ -141,10 +142,17 @@
     clearTimeout(stopTimeout);
     createOverlay();
     isVisible = true;
+    modifiersPrewarmed = false;
     if (wrapper) {
       wrapper.classList.add('glimp-active');
     }
     startCamera();
+  }
+
+  function cancelPrewarm() {
+    if (!modifiersPrewarmed) return;
+    modifiersPrewarmed = false;
+    stopCamera();
   }
 
   function hideOverlay(immediate = false) {
@@ -232,24 +240,44 @@
     if (isLKey(event) && isModifierHeld(event) && event.shiftKey && !isVisible) {
       event.preventDefault();
       showOverlay();
+      return;
+    }
+
+    // Both modifiers are down but L hasn't landed yet — warm the camera up
+    // now so it's already live by the time L is pressed. If this combo turns
+    // out to be some other shortcut (Cmd+Shift+T, Cmd+Shift+N, ...), the
+    // keyup/blur handlers below cancel it again.
+    if (!isVisible && !isLKey(event) && isModifierHeld(event) && event.shiftKey && !modifiersPrewarmed) {
+      modifiersPrewarmed = true;
+      startCamera();
     }
   });
 
   document.addEventListener('keyup', (event) => {
     if (isVisible && isShortcutKey(event)) {
       hideOverlay();
+      return;
+    }
+
+    if (!isVisible && isShortcutKey(event)) {
+      cancelPrewarm();
     }
   });
 
   window.addEventListener('blur', () => {
     if (isVisible) {
       hideOverlay(true);
+    } else {
+      cancelPrewarm();
     }
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && isVisible) {
+    if (!document.hidden) return;
+    if (isVisible) {
       hideOverlay(true);
+    } else {
+      cancelPrewarm();
     }
   });
 
