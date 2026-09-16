@@ -24,6 +24,9 @@
   let cameraActive = false;
   let modifiersPrewarmed = false;
   let pinned = false;
+  let isDragging = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
 
   function isLKey(event) {
     return event.code === 'KeyL' || (event.key && event.key.toLowerCase() === 'l');
@@ -85,6 +88,7 @@
     wrapper.appendChild(placeholder);
     wrapper.appendChild(shutter);
     wrapper.appendChild(pinBadge);
+    wrapper.addEventListener('mousedown', startDrag);
 
     if (document.body) {
       document.body.appendChild(wrapper);
@@ -167,12 +171,63 @@
     stopCamera();
   }
 
+  function setPinned(value) {
+    pinned = value;
+    if (pinBadge) {
+      pinBadge.classList.toggle('glimp-active', value);
+    }
+    if (wrapper) {
+      wrapper.classList.toggle('glimp-pinned', value);
+    }
+    if (!value) {
+      endDrag();
+    }
+  }
+
+  function resetDragPosition() {
+    if (!wrapper) return;
+    wrapper.style.left = '';
+    wrapper.style.top = '';
+    wrapper.style.marginLeft = '';
+  }
+
+  function startDrag(event) {
+    if (!pinned || !wrapper) return;
+    event.preventDefault();
+    const rect = wrapper.getBoundingClientRect();
+    dragOffsetX = event.clientX - rect.left;
+    dragOffsetY = event.clientY - rect.top;
+    isDragging = true;
+    wrapper.classList.add('glimp-dragging');
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('mouseup', endDrag);
+  }
+
+  function onDragMove(event) {
+    if (!isDragging || !wrapper) return;
+    const maxLeft = Math.max(window.innerWidth - wrapper.offsetWidth, 0);
+    const maxTop = Math.max(window.innerHeight - wrapper.offsetHeight, 0);
+    const left = Math.min(Math.max(event.clientX - dragOffsetX, 0), maxLeft);
+    const top = Math.min(Math.max(event.clientY - dragOffsetY, 0), maxTop);
+    wrapper.style.left = `${left}px`;
+    wrapper.style.top = `${top}px`;
+    wrapper.style.marginLeft = '0';
+  }
+
+  function endDrag() {
+    if (!isDragging) return;
+    isDragging = false;
+    if (wrapper) {
+      wrapper.classList.remove('glimp-dragging');
+    }
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('mouseup', endDrag);
+  }
+
   function hideOverlay(immediate = false) {
     isVisible = false;
-    pinned = false;
-    if (pinBadge) {
-      pinBadge.classList.remove('glimp-active');
-    }
+    setPinned(false);
+    resetDragPosition();
     if (wrapper) {
       wrapper.classList.remove('glimp-active');
     }
@@ -263,10 +318,7 @@
     // shortcut keys no longer closes it; only Escape does.
     if (isVisible && !pinned && isPKey(event)) {
       event.preventDefault();
-      pinned = true;
-      if (pinBadge) {
-        pinBadge.classList.add('glimp-active');
-      }
+      setPinned(true);
       return;
     }
 
@@ -274,10 +326,7 @@
     // back off — the very next release then closes it as usual.
     if (isVisible && pinned && isLKey(event) && isModifierHeld(event) && event.shiftKey) {
       event.preventDefault();
-      pinned = false;
-      if (pinBadge) {
-        pinBadge.classList.remove('glimp-active');
-      }
+      setPinned(false);
       return;
     }
 

@@ -28,6 +28,15 @@
   pointer-events: auto;
 }
 
+#glimp-camera-wrapper.glimp-pinned {
+  cursor: grab;
+}
+
+#glimp-camera-wrapper.glimp-dragging {
+  cursor: grabbing;
+  transition: none;
+}
+
 #glimp-camera-video {
   position: absolute;
   top: 0;
@@ -41,6 +50,11 @@
   opacity: 0;
   transition: opacity 0.15s ease-out;
   background: #111;
+  /* The iframe never needs mouse input — leaving it interactive would let it
+     swallow mousedown/mousemove, breaking dragging (see startDrag in
+     content.js: cross-document mouse events can't reach the parent once the
+     cursor is over an iframe's own document). */
+  pointer-events: none;
 }
 
 #glimp-camera-video.glimp-active {
