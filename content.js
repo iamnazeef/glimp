@@ -39,6 +39,8 @@
   let recordingStartedAt = 0;
   let recordingTimerInterval = null;
   let isMuted = false;
+  let isPaused = false;
+  let recordingAccumulatedMs = 0;
   let resizeHandle = null;
   let isResizing = false;
   let resizeStartWidth = 0;
@@ -249,6 +251,8 @@
     }
     isRecording = true;
     isMuted = false;
+    isPaused = false;
+    recordingAccumulatedMs = 0;
     recordingStartedAt = Date.now();
     updateRecordingTimer();
     recordingTimerInterval = setInterval(updateRecordingTimer, 1000);
@@ -269,9 +273,35 @@
     channel.port1.postMessage({ type: 'GLIMP_TOGGLE_MUTE' });
   }
 
+  function pauseRecording() {
+    if (!isRecording || isPaused || !channel) return;
+    isPaused = true;
+    // Timer freezes while paused: fold the time run so far into the
+    // accumulator and stop ticking until resumed.
+    recordingAccumulatedMs += Date.now() - recordingStartedAt;
+    clearInterval(recordingTimerInterval);
+    recordingTimerInterval = null;
+    if (recBadge) {
+      recBadge.classList.add('glimp-paused');
+    }
+    channel.port1.postMessage({ type: 'GLIMP_RECORD_PAUSE' });
+  }
+
+  function resumeRecording() {
+    if (!isRecording || !isPaused || !channel) return;
+    isPaused = false;
+    recordingStartedAt = Date.now();
+    updateRecordingTimer();
+    recordingTimerInterval = setInterval(updateRecordingTimer, 1000);
+    if (recBadge) {
+      recBadge.classList.remove('glimp-paused');
+    }
+    channel.port1.postMessage({ type: 'GLIMP_RECORD_RESUME' });
+  }
+
   function updateRecordingTimer() {
     if (!recTimeEl) return;
-    const elapsed = Math.floor((Date.now() - recordingStartedAt) / 1000);
+    const elapsed = Math.floor((recordingAccumulatedMs + (Date.now() - recordingStartedAt)) / 1000);
     const minutes = Math.floor(elapsed / 60);
     const seconds = elapsed % 60;
     recTimeEl.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
@@ -280,11 +310,14 @@
   function resetRecordingUi() {
     isRecording = false;
     isMuted = false;
+    isPaused = false;
+    recordingAccumulatedMs = 0;
     clearInterval(recordingTimerInterval);
     recordingTimerInterval = null;
     if (recBadge) {
       recBadge.classList.remove('glimp-active');
       recBadge.classList.remove('glimp-muted');
+      recBadge.classList.remove('glimp-paused');
     }
     if (recTimeEl) {
       recTimeEl.textContent = '0:00';
@@ -519,6 +552,19 @@
     if (isVisible && isRecording && isMKey(event)) {
       event.preventDefault();
       toggleMute();
+      return;
+    }
+
+    // Space pauses/resumes the recording in place — the file keeps
+    // recording as one continuous track, just with a gap in content while
+    // paused, instead of stopping and needing a new file.
+    if (isVisible && isRecording && event.code === 'Space') {
+      event.preventDefault();
+      if (isPaused) {
+        resumeRecording();
+      } else {
+        pauseRecording();
+      }
       return;
     }
 

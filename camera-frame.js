@@ -229,6 +229,18 @@
     }
   }
 
+  function pauseRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.pause();
+    }
+  }
+
+  function resumeRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'paused') {
+      mediaRecorder.resume();
+    }
+  }
+
   // Toggles track.enabled rather than stopping/restarting the mic — the
   // recorder keeps running the whole time, it just encodes silence while
   // muted, so there's no gap or restart glitch in the output file.
@@ -276,6 +288,8 @@
     else if (data.type === 'GLIMP_CAPTURE') captureFrame();
     else if (data.type === 'GLIMP_RECORD_START') startRecording();
     else if (data.type === 'GLIMP_RECORD_STOP') stopRecording();
+    else if (data.type === 'GLIMP_RECORD_PAUSE') pauseRecording();
+    else if (data.type === 'GLIMP_RECORD_RESUME') resumeRecording();
     else if (data.type === 'GLIMP_TOGGLE_MUTE') toggleMute();
   }
 

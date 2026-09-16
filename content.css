@@ -200,6 +200,14 @@
   animation: none;
 }
 
+/* Recording paused: dot turns solid amber instead of blinking red — file is
+   still open, just not capturing content right now. Declared after
+   .glimp-muted so it wins visually if somehow both are set at once. */
+#glimp-camera-rec-badge.glimp-paused .glimp-rec-dot {
+  background: #f59e0b;
+  animation: none;
+}
+
 #glimp-camera-resize-handle {
   position: absolute;
   right: 0;
