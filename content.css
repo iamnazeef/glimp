@@ -37,6 +37,10 @@
   transition: none;
 }
 
+#glimp-camera-wrapper.glimp-resizing {
+  transition: none;
+}
+
 #glimp-camera-video {
   position: absolute;
   top: 0;
@@ -187,4 +191,38 @@
 @keyframes glimp-rec-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
+}
+
+/* Mic muted mid-recording: dot turns solid gray and stops blinking instead
+   of red — recording is still running, just without audio. */
+#glimp-camera-rec-badge.glimp-muted .glimp-rec-dot {
+  background: #9ca3af;
+  animation: none;
+}
+
+#glimp-camera-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 12;
+  transition: opacity 0.15s ease-out;
+  /* A mirrored "L" traced flush against the window's own bottom-right
+     corner, using the same 18px radius as #glimp-camera-wrapper.glimp-active
+     so the bracket's curve continues the window's curve instead of floating
+     next to it as a separate shape. */
+  border-right: 2.5px solid #fff;
+  border-bottom: 2.5px solid #fff;
+  border-bottom-right-radius: 18px;
+}
+
+/* Only draggable-looking (and interactive) while pinned — matches the drag
+   affordance, which is also pin-only. */
+#glimp-camera-wrapper.glimp-pinned #glimp-camera-resize-handle {
+  opacity: 1;
+  pointer-events: auto;
 }

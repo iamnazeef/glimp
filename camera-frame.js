@@ -173,6 +173,11 @@
     // silent recording instead of failing.
     const mic = await prewarmMic();
     if (mic) {
+      // Force-unmute so a mute left on from a previous recording in this
+      // session doesn't silently carry over into a fresh one.
+      mic.getAudioTracks().forEach((track) => {
+        track.enabled = true;
+      });
       tracks.push(...mic.getAudioTracks());
     } else {
       console.error('Glimp: microphone unavailable, recording without audio');
@@ -224,6 +229,20 @@
     }
   }
 
+  // Toggles track.enabled rather than stopping/restarting the mic — the
+  // recorder keeps running the whole time, it just encodes silence while
+  // muted, so there's no gap or restart glitch in the output file.
+  function toggleMute() {
+    if (!micStream) return;
+    const tracks = micStream.getAudioTracks();
+    if (!tracks.length) return;
+    const nowEnabled = !tracks[0].enabled;
+    tracks.forEach((track) => {
+      track.enabled = nowEnabled;
+    });
+    reply({ type: 'GLIMP_MUTE_STATE', muted: !nowEnabled });
+  }
+
   function captureFrame() {
     if (!stream || !video.videoWidth || !video.videoHeight) {
       reply({ type: 'GLIMP_CAPTURE_FAILED' });
@@ -257,6 +276,7 @@
     else if (data.type === 'GLIMP_CAPTURE') captureFrame();
     else if (data.type === 'GLIMP_RECORD_START') startRecording();
     else if (data.type === 'GLIMP_RECORD_STOP') stopRecording();
+    else if (data.type === 'GLIMP_TOGGLE_MUTE') toggleMute();
   }
 
   // Only the first handshake is accepted so a page script racing to open its

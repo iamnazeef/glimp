@@ -8,7 +8,12 @@
   const SHUTTER_ID = 'glimp-camera-shutter';
   const PIN_BADGE_ID = 'glimp-camera-pin-badge';
   const REC_BADGE_ID = 'glimp-camera-rec-badge';
+  const RESIZE_HANDLE_ID = 'glimp-camera-resize-handle';
   const EXTENSION_ORIGIN = chrome.runtime.getURL('').replace(/\/$/, '');
+
+  const RESIZE_MIN_WIDTH = 200;
+  const RESIZE_MAX_WIDTH = 640;
+  const RESIZE_ASPECT_RATIO = 240 / 320;
 
   let wrapper = null;
   let video = null;
@@ -33,6 +38,11 @@
   let isRecording = false;
   let recordingStartedAt = 0;
   let recordingTimerInterval = null;
+  let isMuted = false;
+  let resizeHandle = null;
+  let isResizing = false;
+  let resizeStartWidth = 0;
+  let resizeStartX = 0;
 
   function isLKey(event) {
     return event.code === 'KeyL' || (event.key && event.key.toLowerCase() === 'l');
@@ -44,6 +54,10 @@
 
   function isRKey(event) {
     return event.code === 'KeyR' || (event.key && event.key.toLowerCase() === 'r');
+  }
+
+  function isMKey(event) {
+    return event.code === 'KeyM' || (event.key && event.key.toLowerCase() === 'm');
   }
 
   function isModifierHeld(event) {
@@ -104,11 +118,16 @@
     recBadge.appendChild(recDot);
     recBadge.appendChild(recTimeEl);
 
+    resizeHandle = document.createElement('div');
+    resizeHandle.id = RESIZE_HANDLE_ID;
+    resizeHandle.addEventListener('mousedown', startResize);
+
     wrapper.appendChild(video);
     wrapper.appendChild(placeholder);
     wrapper.appendChild(shutter);
     wrapper.appendChild(pinBadge);
     wrapper.appendChild(recBadge);
+    wrapper.appendChild(resizeHandle);
     wrapper.addEventListener('mousedown', startDrag);
 
     if (document.body) {
@@ -153,6 +172,11 @@
     } else if (data.type === 'GLIMP_RECORD_ERROR') {
       console.error('Glimp recording error:', data.message);
       resetRecordingUi();
+    } else if (data.type === 'GLIMP_MUTE_STATE') {
+      isMuted = data.muted;
+      if (recBadge) {
+        recBadge.classList.toggle('glimp-muted', isMuted);
+      }
     }
   }
 
@@ -207,6 +231,7 @@
     }
     if (!value) {
       endDrag();
+      endResize();
       // Unpinning implies going back to release-to-close — an active
       // recording would otherwise keep running invisibly and be lost the
       // moment the keys are released.
@@ -223,6 +248,7 @@
       setPinned(true);
     }
     isRecording = true;
+    isMuted = false;
     recordingStartedAt = Date.now();
     updateRecordingTimer();
     recordingTimerInterval = setInterval(updateRecordingTimer, 1000);
@@ -233,8 +259,14 @@
     }
     if (recBadge) {
       recBadge.classList.add('glimp-active');
+      recBadge.classList.remove('glimp-muted');
     }
     channel.port1.postMessage({ type: 'GLIMP_RECORD_START' });
+  }
+
+  function toggleMute() {
+    if (!isRecording || !channel) return;
+    channel.port1.postMessage({ type: 'GLIMP_TOGGLE_MUTE' });
   }
 
   function updateRecordingTimer() {
@@ -247,10 +279,12 @@
 
   function resetRecordingUi() {
     isRecording = false;
+    isMuted = false;
     clearInterval(recordingTimerInterval);
     recordingTimerInterval = null;
     if (recBadge) {
       recBadge.classList.remove('glimp-active');
+      recBadge.classList.remove('glimp-muted');
     }
     if (recTimeEl) {
       recTimeEl.textContent = '0:00';
@@ -325,10 +359,58 @@
     document.removeEventListener('mouseup', endDrag);
   }
 
+  function resetSize() {
+    if (!wrapper) return;
+    wrapper.style.width = '';
+    wrapper.style.height = '';
+  }
+
+  function startResize(event) {
+    if (!pinned || !wrapper) return;
+    event.preventDefault();
+    // Don't let this bubble up to the wrapper's own mousedown (startDrag) —
+    // resizing and dragging can't both react to the same mousedown.
+    event.stopPropagation();
+
+    // Pin the box's current on-screen position as explicit left/top before
+    // growing it, so resizing expands from the top-left corner in place
+    // instead of the box re-centering under the stale 50%+margin CSS.
+    const rect = wrapper.getBoundingClientRect();
+    wrapper.style.left = `${rect.left}px`;
+    wrapper.style.top = `${rect.top}px`;
+    wrapper.style.marginLeft = '0';
+
+    resizeStartWidth = rect.width;
+    resizeStartX = event.clientX;
+    isResizing = true;
+    wrapper.classList.add('glimp-resizing');
+    document.addEventListener('mousemove', onResizeMove);
+    document.addEventListener('mouseup', endResize);
+  }
+
+  function onResizeMove(event) {
+    if (!isResizing || !wrapper) return;
+    const deltaX = event.clientX - resizeStartX;
+    const width = Math.min(RESIZE_MAX_WIDTH, Math.max(RESIZE_MIN_WIDTH, resizeStartWidth + deltaX));
+    wrapper.style.width = `${width}px`;
+    wrapper.style.height = `${width * RESIZE_ASPECT_RATIO}px`;
+  }
+
+  function endResize() {
+    if (!isResizing) return;
+    isResizing = false;
+    if (wrapper) {
+      wrapper.classList.remove('glimp-resizing');
+    }
+    document.removeEventListener('mousemove', onResizeMove);
+    document.removeEventListener('mouseup', endResize);
+  }
+
   function hideOverlay(immediate = false) {
     isVisible = false;
     setPinned(false);
     resetDragPosition();
+    resetSize();
     if (wrapper) {
       wrapper.classList.remove('glimp-active');
     }
@@ -430,6 +512,13 @@
       } else {
         startRecording();
       }
+      return;
+    }
+
+    // M mutes/unmutes the mic mid-recording without stopping it.
+    if (isVisible && isRecording && isMKey(event)) {
+      event.preventDefault();
+      toggleMute();
       return;
     }
 
