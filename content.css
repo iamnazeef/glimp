@@ -108,3 +108,27 @@
   15% { opacity: 0.95; }
   100% { opacity: 0; }
 }
+
+#glimp-camera-pin-badge {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%) translateY(6px);
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font: 600 9px/1.4 system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 11;
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+
+#glimp-camera-pin-badge.glimp-active {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

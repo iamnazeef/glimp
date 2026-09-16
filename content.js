@@ -6,12 +6,14 @@
   const VIDEO_ID = 'glimp-camera-video';
   const PLACEHOLDER_ID = 'glimp-camera-placeholder';
   const SHUTTER_ID = 'glimp-camera-shutter';
+  const PIN_BADGE_ID = 'glimp-camera-pin-badge';
   const EXTENSION_ORIGIN = chrome.runtime.getURL('').replace(/\/$/, '');
 
   let wrapper = null;
   let video = null;
   let placeholder = null;
   let shutter = null;
+  let pinBadge = null;
   let isVisible = false;
   let stopTimeout = null;
   let permissionDenied = false;
@@ -75,9 +77,14 @@
     shutter = document.createElement('div');
     shutter.id = SHUTTER_ID;
 
+    pinBadge = document.createElement('div');
+    pinBadge.id = PIN_BADGE_ID;
+    pinBadge.textContent = 'Pinned';
+
     wrapper.appendChild(video);
     wrapper.appendChild(placeholder);
     wrapper.appendChild(shutter);
+    wrapper.appendChild(pinBadge);
 
     if (document.body) {
       document.body.appendChild(wrapper);
@@ -163,6 +170,9 @@
   function hideOverlay(immediate = false) {
     isVisible = false;
     pinned = false;
+    if (pinBadge) {
+      pinBadge.classList.remove('glimp-active');
+    }
     if (wrapper) {
       wrapper.classList.remove('glimp-active');
     }
@@ -254,6 +264,20 @@
     if (isVisible && !pinned && isPKey(event)) {
       event.preventDefault();
       pinned = true;
+      if (pinBadge) {
+        pinBadge.classList.add('glimp-active');
+      }
+      return;
+    }
+
+    // Pressing the same open shortcut again while pinned toggles the pin
+    // back off — the very next release then closes it as usual.
+    if (isVisible && pinned && isLKey(event) && isModifierHeld(event) && event.shiftKey) {
+      event.preventDefault();
+      pinned = false;
+      if (pinBadge) {
+        pinBadge.classList.remove('glimp-active');
+      }
       return;
     }
 
