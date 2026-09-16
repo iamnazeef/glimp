@@ -21,9 +21,14 @@
   let pendingStart = false;
   let cameraActive = false;
   let modifiersPrewarmed = false;
+  let pinned = false;
 
   function isLKey(event) {
     return event.code === 'KeyL' || (event.key && event.key.toLowerCase() === 'l');
+  }
+
+  function isPKey(event) {
+    return event.code === 'KeyP' || (event.key && event.key.toLowerCase() === 'p');
   }
 
   function isModifierHeld(event) {
@@ -157,6 +162,7 @@
 
   function hideOverlay(immediate = false) {
     isVisible = false;
+    pinned = false;
     if (wrapper) {
       wrapper.classList.remove('glimp-active');
     }
@@ -231,9 +237,23 @@
   document.addEventListener('keydown', (event) => {
     if (event.repeat) return;
 
+    if (isVisible && event.code === 'Escape') {
+      event.preventDefault();
+      hideOverlay();
+      return;
+    }
+
     if (isVisible && event.code === 'Enter') {
       event.preventDefault();
       captureImage();
+      return;
+    }
+
+    // Pressing P while the preview is open pins it open — releasing the
+    // shortcut keys no longer closes it; only Escape does.
+    if (isVisible && !pinned && isPKey(event)) {
+      event.preventDefault();
+      pinned = true;
       return;
     }
 
@@ -254,7 +274,7 @@
   });
 
   document.addEventListener('keyup', (event) => {
-    if (isVisible && isShortcutKey(event)) {
+    if (isVisible && !pinned && isShortcutKey(event)) {
       hideOverlay();
       return;
     }
