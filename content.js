@@ -147,9 +147,9 @@
       }
       hideOverlay(true);
     } else if (data.type === 'GLIMP_CAPTURED') {
-      downloadCapture(data.dataUrl);
+      downloadBlob(data.blob, 'png');
     } else if (data.type === 'GLIMP_RECORDING_STOPPED') {
-      downloadRecording(data.blob);
+      downloadBlob(data.blob, 'webm');
     } else if (data.type === 'GLIMP_RECORD_ERROR') {
       console.error('Glimp recording error:', data.message);
       resetRecordingUi();
@@ -271,11 +271,11 @@
     }
   }
 
-  function downloadRecording(blob) {
+  function downloadBlob(blob, extension) {
     if (!blob) return;
 
     const url = URL.createObjectURL(blob);
-    const filename = `glimp-${Date.now()}.webm`;
+    const filename = `glimp-${Date.now()}.${extension}`;
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
@@ -356,18 +356,6 @@
     triggerShutter();
     playCaptureSound();
     channel.port1.postMessage({ type: 'GLIMP_CAPTURE' });
-  }
-
-  function downloadCapture(dataUrl) {
-    if (!dataUrl) return;
-
-    const filename = `glimp-${Date.now()}.png`;
-    const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
   }
 
   function playCaptureSound() {

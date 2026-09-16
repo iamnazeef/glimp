@@ -193,7 +193,12 @@
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    reply({ type: 'GLIMP_CAPTURED', dataUrl: canvas.toDataURL('image/png') });
+    // A Blob (not a data URL) so the download goes through the exact same
+    // code path as recordings — a data URL vs. blob URL download visibly
+    // behaves differently in Chrome's own download-bubble UI.
+    canvas.toBlob((blob) => {
+      reply({ type: 'GLIMP_CAPTURED', blob });
+    }, 'image/png');
   }
 
   function handlePortMessage(event) {
