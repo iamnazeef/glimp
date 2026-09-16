@@ -76,7 +76,7 @@
     // re-prompting per site.
     video = document.createElement('iframe');
     video.id = VIDEO_ID;
-    video.setAttribute('allow', 'camera');
+    video.setAttribute('allow', 'camera; microphone');
     video.setAttribute('frameborder', '0');
     video.addEventListener('load', initFrameChannel, { once: true });
     video.src = chrome.runtime.getURL('camera-frame.html');

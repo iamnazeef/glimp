@@ -9,6 +9,9 @@
   let recordingCanvas = null;
   let recordingCtx = null;
   let recordingRafId = null;
+  let recordingAudioStream = null;
+  let recordingStarting = false;
+  let recordingStopRequested = false;
 
   function reply(message) {
     if (!port) return;
@@ -57,10 +60,9 @@
 
   function stopCamera() {
     // Defensive: recording is always stopped explicitly by content.js before
-    // this runs, but never leave a recorder attached to tracks about to die.
-    if (mediaRecorder) {
-      mediaRecorder.stop();
-    }
+    // this runs, but never leave a recorder (or an in-flight mic request)
+    // attached to a camera that's about to die.
+    stopRecording();
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
       stream = null;
@@ -81,8 +83,19 @@
     recordingRafId = requestAnimationFrame(drawMirroredFrame);
   }
 
-  function startRecording() {
-    if (mediaRecorder || !stream) return;
+  function teardownRecordingState() {
+    cancelAnimationFrame(recordingRafId);
+    recordingRafId = null;
+    recordingCanvas = null;
+    recordingCtx = null;
+    if (recordingAudioStream) {
+      recordingAudioStream.getTracks().forEach((track) => track.stop());
+      recordingAudioStream = null;
+    }
+  }
+
+  async function startRecording() {
+    if (mediaRecorder || recordingStarting || !stream) return;
     if (!video.videoWidth || !video.videoHeight) {
       // Camera just started and hasn't produced a frame yet — report it
       // instead of silently no-op'ing, so content.js's optimistic
@@ -90,6 +103,9 @@
       reply({ type: 'GLIMP_RECORD_ERROR', message: 'Camera not ready yet' });
       return;
     }
+
+    recordingStarting = true;
+    recordingStopRequested = false;
 
     // MediaRecorder records raw track pixels — it can't apply the mirror the
     // live preview gets from a CSS transform. Recording from a canvas we
@@ -101,14 +117,36 @@
     recordingCtx = recordingCanvas.getContext('2d');
     recordingRafId = requestAnimationFrame(drawMirroredFrame);
 
+    const tracks = recordingCanvas.captureStream(30).getVideoTracks();
+
+    // Mic access is requested here, not alongside the camera in
+    // startCamera() — so a plain preview/photo never lights up the
+    // microphone, only an actual recording does. If it's denied or
+    // unavailable, fall back to a silent recording instead of failing.
+    try {
+      recordingAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      tracks.push(...recordingAudioStream.getAudioTracks());
+    } catch (err) {
+      console.error('Glimp: microphone unavailable, recording without audio', err);
+      recordingAudioStream = null;
+    }
+
+    // A stop (or the camera itself stopping) can land while getUserMedia for
+    // the mic was still negotiating — tear everything down instead of
+    // starting a recording nobody wants anymore.
+    if (recordingStopRequested) {
+      recordingStopRequested = false;
+      recordingStarting = false;
+      teardownRecordingState();
+      return;
+    }
+
     recordedChunks = [];
     try {
-      mediaRecorder = new MediaRecorder(recordingCanvas.captureStream(30), { mimeType: 'video/webm' });
+      mediaRecorder = new MediaRecorder(new MediaStream(tracks), { mimeType: 'video/webm' });
     } catch (err) {
-      cancelAnimationFrame(recordingRafId);
-      recordingRafId = null;
-      recordingCanvas = null;
-      recordingCtx = null;
+      recordingStarting = false;
+      teardownRecordingState();
       reply({ type: 'GLIMP_RECORD_ERROR', message: err && err.message });
       return;
     }
@@ -119,21 +157,24 @@
       }
     };
     mediaRecorder.onstop = () => {
-      cancelAnimationFrame(recordingRafId);
-      recordingRafId = null;
-      recordingCanvas = null;
-      recordingCtx = null;
+      teardownRecordingState();
       const blob = new Blob(recordedChunks, { type: 'video/webm' });
       recordedChunks = [];
       mediaRecorder = null;
       reply({ type: 'GLIMP_RECORDING_STOPPED', blob });
     };
     mediaRecorder.start();
+    recordingStarting = false;
   }
 
   function stopRecording() {
-    if (!mediaRecorder) return;
-    mediaRecorder.stop();
+    if (mediaRecorder) {
+      mediaRecorder.stop();
+      return;
+    }
+    if (recordingStarting) {
+      recordingStopRequested = true;
+    }
   }
 
   function captureFrame() {
