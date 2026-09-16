@@ -359,6 +359,13 @@
 
   window.addEventListener('blur', () => {
     if (isVisible) {
+      // A plain tab switch also fires window blur (not just switching to a
+      // different application), so this needs the same pinned exemption as
+      // visibilitychange below — otherwise this fires first and closes it
+      // anyway. Net effect: pinned now also survives switching applications
+      // entirely, not just switching tabs, since blur doesn't distinguish
+      // the two.
+      if (pinned) return;
       hideOverlay(true);
     } else {
       cancelPrewarm();
@@ -368,6 +375,12 @@
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) return;
     if (isVisible) {
+      // Pinning means "stay open until Escape" — switching tabs shouldn't
+      // count as closing it. The camera keeps running in this background
+      // tab until you come back and press Escape (keyboard shortcuts can't
+      // reach a tab that isn't focused, so Esc/Enter won't work from
+      // elsewhere in the meantime).
+      if (pinned) return;
       hideOverlay(true);
     } else {
       cancelPrewarm();
