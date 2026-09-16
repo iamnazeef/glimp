@@ -4,6 +4,11 @@
   let port = null;
   let stopRequested = false;
   let starting = false;
+  let mediaRecorder = null;
+  let recordedChunks = [];
+  let recordingCanvas = null;
+  let recordingCtx = null;
+  let recordingRafId = null;
 
   function reply(message) {
     if (!port) return;
@@ -51,6 +56,11 @@
   }
 
   function stopCamera() {
+    // Defensive: recording is always stopped explicitly by content.js before
+    // this runs, but never leave a recorder attached to tracks about to die.
+    if (mediaRecorder) {
+      mediaRecorder.stop();
+    }
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
       stream = null;
@@ -58,6 +68,72 @@
     } else {
       stopRequested = true;
     }
+  }
+
+  function drawMirroredFrame() {
+    if (recordingCtx) {
+      // A flip matrix set fresh every frame (rather than save/translate/scale
+      // per draw) — cheap and correct since setTransform replaces, not
+      // accumulates, the current transform.
+      recordingCtx.setTransform(-1, 0, 0, 1, recordingCanvas.width, 0);
+      recordingCtx.drawImage(video, 0, 0, recordingCanvas.width, recordingCanvas.height);
+    }
+    recordingRafId = requestAnimationFrame(drawMirroredFrame);
+  }
+
+  function startRecording() {
+    if (mediaRecorder || !stream) return;
+    if (!video.videoWidth || !video.videoHeight) {
+      // Camera just started and hasn't produced a frame yet — report it
+      // instead of silently no-op'ing, so content.js's optimistic
+      // "recording" UI gets rolled back rather than stuck on.
+      reply({ type: 'GLIMP_RECORD_ERROR', message: 'Camera not ready yet' });
+      return;
+    }
+
+    // MediaRecorder records raw track pixels — it can't apply the mirror the
+    // live preview gets from a CSS transform. Recording from a canvas we
+    // redraw mirrored every frame (same flip captureFrame() already does for
+    // photos) is the only way to get a mirrored file out of it.
+    recordingCanvas = document.createElement('canvas');
+    recordingCanvas.width = video.videoWidth;
+    recordingCanvas.height = video.videoHeight;
+    recordingCtx = recordingCanvas.getContext('2d');
+    recordingRafId = requestAnimationFrame(drawMirroredFrame);
+
+    recordedChunks = [];
+    try {
+      mediaRecorder = new MediaRecorder(recordingCanvas.captureStream(30), { mimeType: 'video/webm' });
+    } catch (err) {
+      cancelAnimationFrame(recordingRafId);
+      recordingRafId = null;
+      recordingCanvas = null;
+      recordingCtx = null;
+      reply({ type: 'GLIMP_RECORD_ERROR', message: err && err.message });
+      return;
+    }
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        recordedChunks.push(event.data);
+      }
+    };
+    mediaRecorder.onstop = () => {
+      cancelAnimationFrame(recordingRafId);
+      recordingRafId = null;
+      recordingCanvas = null;
+      recordingCtx = null;
+      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      recordedChunks = [];
+      mediaRecorder = null;
+      reply({ type: 'GLIMP_RECORDING_STOPPED', blob });
+    };
+    mediaRecorder.start();
+  }
+
+  function stopRecording() {
+    if (!mediaRecorder) return;
+    mediaRecorder.stop();
   }
 
   function captureFrame() {
@@ -86,6 +162,8 @@
     if (data.type === 'GLIMP_START') startCamera();
     else if (data.type === 'GLIMP_STOP') stopCamera();
     else if (data.type === 'GLIMP_CAPTURE') captureFrame();
+    else if (data.type === 'GLIMP_RECORD_START') startRecording();
+    else if (data.type === 'GLIMP_RECORD_STOP') stopRecording();
   }
 
   // Only the first handshake is accepted so a page script racing to open its

@@ -146,3 +146,45 @@
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+#glimp-camera-rec-badge {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font: 600 9px/1.4 system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: 0.3px;
+  opacity: 0;
+  /* Same slot and motion as the pinned badge (left: 50% + translateX(-50%),
+     same translateY offset/timing) so toggling between the two reads as one
+     sliding out while the other slides in, not two unrelated badges. */
+  transform: translateX(-50%) translateY(6px);
+  pointer-events: none;
+  z-index: 11;
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+
+#glimp-camera-rec-badge.glimp-active {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.glimp-rec-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: glimp-rec-blink 1s ease-in-out infinite;
+}
+
+@keyframes glimp-rec-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}

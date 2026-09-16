@@ -7,6 +7,7 @@
   const PLACEHOLDER_ID = 'glimp-camera-placeholder';
   const SHUTTER_ID = 'glimp-camera-shutter';
   const PIN_BADGE_ID = 'glimp-camera-pin-badge';
+  const REC_BADGE_ID = 'glimp-camera-rec-badge';
   const EXTENSION_ORIGIN = chrome.runtime.getURL('').replace(/\/$/, '');
 
   let wrapper = null;
@@ -14,6 +15,8 @@
   let placeholder = null;
   let shutter = null;
   let pinBadge = null;
+  let recBadge = null;
+  let recTimeEl = null;
   let isVisible = false;
   let stopTimeout = null;
   let permissionDenied = false;
@@ -27,6 +30,9 @@
   let isDragging = false;
   let dragOffsetX = 0;
   let dragOffsetY = 0;
+  let isRecording = false;
+  let recordingStartedAt = 0;
+  let recordingTimerInterval = null;
 
   function isLKey(event) {
     return event.code === 'KeyL' || (event.key && event.key.toLowerCase() === 'l');
@@ -34,6 +40,10 @@
 
   function isPKey(event) {
     return event.code === 'KeyP' || (event.key && event.key.toLowerCase() === 'p');
+  }
+
+  function isRKey(event) {
+    return event.code === 'KeyR' || (event.key && event.key.toLowerCase() === 'r');
   }
 
   function isModifierHeld(event) {
@@ -84,10 +94,21 @@
     pinBadge.id = PIN_BADGE_ID;
     pinBadge.textContent = 'Pinned';
 
+    recBadge = document.createElement('div');
+    recBadge.id = REC_BADGE_ID;
+    const recDot = document.createElement('span');
+    recDot.className = 'glimp-rec-dot';
+    recTimeEl = document.createElement('span');
+    recTimeEl.className = 'glimp-rec-time';
+    recTimeEl.textContent = '0:00';
+    recBadge.appendChild(recDot);
+    recBadge.appendChild(recTimeEl);
+
     wrapper.appendChild(video);
     wrapper.appendChild(placeholder);
     wrapper.appendChild(shutter);
     wrapper.appendChild(pinBadge);
+    wrapper.appendChild(recBadge);
     wrapper.addEventListener('mousedown', startDrag);
 
     if (document.body) {
@@ -127,6 +148,11 @@
       hideOverlay(true);
     } else if (data.type === 'GLIMP_CAPTURED') {
       downloadCapture(data.dataUrl);
+    } else if (data.type === 'GLIMP_RECORDING_STOPPED') {
+      downloadRecording(data.blob);
+    } else if (data.type === 'GLIMP_RECORD_ERROR') {
+      console.error('Glimp recording error:', data.message);
+      resetRecordingUi();
     }
   }
 
@@ -181,7 +207,82 @@
     }
     if (!value) {
       endDrag();
+      // Unpinning implies going back to release-to-close — an active
+      // recording would otherwise keep running invisibly and be lost the
+      // moment the keys are released.
+      stopRecording();
     }
+  }
+
+  function startRecording() {
+    if (isRecording || !cameraActive || !channel) return;
+    // Recording only makes sense if the preview sticks around; this is what
+    // makes Cmd/Ctrl+Shift+L+R (L already held, then R) pin-and-record in
+    // one motion without a separate combo to detect.
+    if (!pinned) {
+      setPinned(true);
+    }
+    isRecording = true;
+    recordingStartedAt = Date.now();
+    updateRecordingTimer();
+    recordingTimerInterval = setInterval(updateRecordingTimer, 1000);
+    // The recording indicator replaces the pinned badge while active —
+    // showing both is redundant since recording already implies pinned.
+    if (pinBadge) {
+      pinBadge.classList.remove('glimp-active');
+    }
+    if (recBadge) {
+      recBadge.classList.add('glimp-active');
+    }
+    channel.port1.postMessage({ type: 'GLIMP_RECORD_START' });
+  }
+
+  function updateRecordingTimer() {
+    if (!recTimeEl) return;
+    const elapsed = Math.floor((Date.now() - recordingStartedAt) / 1000);
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    recTimeEl.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  function resetRecordingUi() {
+    isRecording = false;
+    clearInterval(recordingTimerInterval);
+    recordingTimerInterval = null;
+    if (recBadge) {
+      recBadge.classList.remove('glimp-active');
+    }
+    if (recTimeEl) {
+      recTimeEl.textContent = '0:00';
+    }
+    // Bring the pinned badge back, but only if we're still pinned — when
+    // this runs because setPinned(false) is unpinning/closing, pinned is
+    // already false by the time we get here, so it correctly stays hidden.
+    if (pinBadge) {
+      pinBadge.classList.toggle('glimp-active', pinned);
+    }
+  }
+
+  function stopRecording() {
+    if (!isRecording) return;
+    resetRecordingUi();
+    if (channel) {
+      channel.port1.postMessage({ type: 'GLIMP_RECORD_STOP' });
+    }
+  }
+
+  function downloadRecording(blob) {
+    if (!blob) return;
+
+    const url = URL.createObjectURL(blob);
+    const filename = `glimp-${Date.now()}.webm`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   }
 
   function resetDragPosition() {
@@ -319,6 +420,20 @@
     if (isVisible && !pinned && isPKey(event)) {
       event.preventDefault();
       setPinned(true);
+      return;
+    }
+
+    // R toggles recording. Pressing it while the base combo is still held
+    // (Cmd/Ctrl+Shift+L+R in one motion) both pins and starts recording,
+    // since startRecording() pins implicitly if needed — no separate
+    // four-key combo detection required.
+    if (isVisible && isRKey(event)) {
+      event.preventDefault();
+      if (isRecording) {
+        stopRecording();
+      } else {
+        startRecording();
+      }
       return;
     }
 
