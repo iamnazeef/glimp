@@ -236,6 +236,64 @@
       margin-bottom: 6px;
     }
 
+    .help-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 24px;
+      margin-top: 32px;
+      text-align: left;
+    }
+
+    .help-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #71717a;
+      margin-bottom: 16px;
+    }
+
+    .shortcut-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .shortcut-list li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .shortcut-desc {
+      font-size: 14px;
+      color: #d4d4d8;
+    }
+
+    .shortcut-keys {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .shortcut-keys kbd {
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      background: #18181b;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      padding: 4px 8px;
+    }
+
+    .shortcut-keys .sep {
+      color: #52525b;
+      font-size: 12px;
+    }
+
     .features {
       display: flex;
       justify-content: center;
@@ -280,7 +338,7 @@
     <div class="shortcut-card">
       <div class="shortcut-label">Your shortcut</div>
       <div class="keys">
-        <span class="key" id="modKey">Ctrl</span>
+        <span class="key mod-key">Ctrl</span>
         <span class="plus">+</span>
         <span class="key">Shift</span>
         <span class="plus">+</span>
@@ -338,6 +396,36 @@
         </svg>
         Press Enter while holding the shortcut to capture
       </div>
+    </div>
+
+    <div class="help-card">
+      <div class="help-title">All shortcuts</div>
+      <ul class="shortcut-list">
+        <li>
+          <span class="shortcut-desc">Hold to open the preview</span>
+          <span class="shortcut-keys">
+            <kbd class="mod-key">Ctrl</kbd><span class="sep">+</span><kbd>Shift</kbd><span class="sep">+</span><kbd>L</kbd>
+          </span>
+        </li>
+        <li>
+          <span class="shortcut-desc">Capture a photo</span>
+          <span class="shortcut-keys"><kbd>Enter</kbd></span>
+        </li>
+        <li>
+          <span class="shortcut-desc">Pin the preview open (ignore key releases)</span>
+          <span class="shortcut-keys"><kbd>P</kbd></span>
+        </li>
+        <li>
+          <span class="shortcut-desc">Unpin (while pinned)</span>
+          <span class="shortcut-keys">
+            <kbd class="mod-key">Ctrl</kbd><span class="sep">+</span><kbd>Shift</kbd><span class="sep">+</span><kbd>L</kbd><span class="sep">again</span>
+          </span>
+        </li>
+        <li>
+          <span class="shortcut-desc">Close the preview</span>
+          <span class="shortcut-keys"><kbd>Esc</kbd><span class="sep">or release keys</span></span>
+        </li>
+      </ul>
     </div>
   </div>
 

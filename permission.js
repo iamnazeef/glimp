@@ -4,11 +4,13 @@
   const status = document.getElementById('status');
   const spinner = document.getElementById('spinner');
   const placeholderText = document.getElementById('placeholderText');
-  const modKey = document.getElementById('modKey');
+  const modKeys = document.querySelectorAll('.mod-key');
   const permissionTip = document.getElementById('permissionTip');
 
   if (navigator.platform.toLowerCase().includes('mac') || navigator.userAgent.toLowerCase().includes('mac')) {
-    modKey.textContent = 'Cmd';
+    modKeys.forEach((el) => {
+      el.textContent = 'Cmd';
+    });
   }
 
   let stream = null;
