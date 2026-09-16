@@ -404,10 +404,18 @@
     }
 
     // Pressing P while the preview is open pins it open — releasing the
-    // shortcut keys no longer closes it; only Escape does.
+    // shortcut keys no longer closes it; only Escape (or P again) does.
     if (isVisible && !pinned && isPKey(event)) {
       event.preventDefault();
       setPinned(true);
+      return;
+    }
+
+    // Pressing P again while pinned unpins AND closes outright, same as
+    // Escape — a one-key way out without reaching for a different key.
+    if (isVisible && pinned && isPKey(event)) {
+      event.preventDefault();
+      hideOverlay();
       return;
     }
 

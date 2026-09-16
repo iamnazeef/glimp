@@ -9,16 +9,62 @@
   let recordingCanvas = null;
   let recordingCtx = null;
   let recordingRafId = null;
-  let recordingAudioStream = null;
   let recordingStarting = false;
   let recordingStopRequested = false;
+  let micStream = null;
+  let micStartPromise = null;
+  let micStopRequested = false;
 
   function reply(message) {
     if (!port) return;
     port.postMessage(message);
   }
 
+  // Mic hardware has a real ramp-up delay after getUserMedia resolves — audio
+  // requested only once R is pressed lands a beat or two of silence at the
+  // start of every recording. Acquiring it as soon as the camera itself
+  // starts (including the Cmd/Ctrl+Shift prewarm, before L even lands) gives
+  // it time to settle before a recording can possibly begin.
+  function prewarmMic() {
+    if (micStream) return Promise.resolve(micStream);
+    if (micStartPromise) return micStartPromise;
+
+    micStopRequested = false;
+    micStartPromise = navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((acquired) => {
+        if (micStopRequested) {
+          micStopRequested = false;
+          acquired.getTracks().forEach((track) => track.stop());
+          return null;
+        }
+        micStream = acquired;
+        return acquired;
+      })
+      .catch((err) => {
+        console.error('Glimp: microphone prewarm failed', err);
+        return null;
+      })
+      .finally(() => {
+        micStartPromise = null;
+      });
+    return micStartPromise;
+  }
+
+  function stopMic() {
+    if (micStream) {
+      micStream.getTracks().forEach((track) => track.stop());
+      micStream = null;
+    } else if (micStartPromise) {
+      micStopRequested = true;
+    }
+  }
+
   async function startCamera() {
+    // Fire-and-forget: runs alongside the video negotiation below, not
+    // blocking on it.
+    prewarmMic();
+
     if (stream) {
       reply({ type: 'GLIMP_STARTED' });
       return;
@@ -63,6 +109,7 @@
     // this runs, but never leave a recorder (or an in-flight mic request)
     // attached to a camera that's about to die.
     stopRecording();
+    stopMic();
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
       stream = null;
@@ -88,10 +135,10 @@
     recordingRafId = null;
     recordingCanvas = null;
     recordingCtx = null;
-    if (recordingAudioStream) {
-      recordingAudioStream.getTracks().forEach((track) => track.stop());
-      recordingAudioStream = null;
-    }
+    // The mic stream is owned by the camera's lifecycle now (see prewarmMic),
+    // not the recording's — leave it running so back-to-back recordings in
+    // the same session reuse the already-warm stream instead of re-prompting
+    // ramp-up delay each time. stopCamera() is what tears it down.
   }
 
   async function startRecording() {
@@ -119,16 +166,16 @@
 
     const tracks = recordingCanvas.captureStream(30).getVideoTracks();
 
-    // Mic access is requested here, not alongside the camera in
-    // startCamera() — so a plain preview/photo never lights up the
-    // microphone, only an actual recording does. If it's denied or
-    // unavailable, fall back to a silent recording instead of failing.
-    try {
-      recordingAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      tracks.push(...recordingAudioStream.getAudioTracks());
-    } catch (err) {
-      console.error('Glimp: microphone unavailable, recording without audio', err);
-      recordingAudioStream = null;
+    // Reuses the mic prewarmed in startCamera() so it's already past its
+    // hardware ramp-up by now. Only actually waits on getUserMedia here if
+    // recording started before that prewarm finished (e.g. an instant
+    // Cmd/Ctrl+Shift+L+R). If it's denied or unavailable, fall back to a
+    // silent recording instead of failing.
+    const mic = await prewarmMic();
+    if (mic) {
+      tracks.push(...mic.getAudioTracks());
+    } else {
+      console.error('Glimp: microphone unavailable, recording without audio');
     }
 
     // A stop (or the camera itself stopping) can land while getUserMedia for
