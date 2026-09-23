@@ -352,6 +352,26 @@
       margin-bottom: 16px;
     }
 
+    .screenshot-gallery {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .screenshot-gallery img {
+      width: 100%;
+      display: block;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    @media (max-width: 480px) {
+      .screenshot-gallery {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .shortcut-list {
       list-style: none;
       display: flex;
@@ -428,6 +448,7 @@
     <a class="sidebar-link" href="#try-it">Try it</a>
     <a class="sidebar-link" href="#features">Features</a>
     <a class="sidebar-link" href="#shortcuts">Shortcuts</a>
+    <a class="sidebar-link" href="#screenshots">Screenshots</a>
     <a class="sidebar-link" href="#faq">FAQ</a>
   </nav>
   <div class="container">
@@ -560,6 +581,16 @@
           <span class="shortcut-keys"><kbd>Esc</kbd><span class="sep">or</span><kbd>P</kbd><span class="sep">again, or just let go</span></span>
         </li>
       </ul>
+    </div>
+    </section>
+
+    <section id="screenshots">
+    <div class="help-card">
+      <div class="help-title">Screenshots</div>
+      <div class="screenshot-gallery">
+        <img src="screenshot-1.png" alt="Glimp pinned camera preview, centered on the page">
+        <img src="screenshot-2.png" alt="Glimp pinned camera preview, dragged to the corner">
+      </div>
     </div>
     </section>
 

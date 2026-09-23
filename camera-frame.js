@@ -1,4 +1,10 @@
 (() => {
+  // TEMP DEV FLAG — for taking Chrome Web Store screenshots without a real
+  // camera feed. When true, startCamera() draws a placeholder graphic to a
+  // canvas and feeds that in as the stream instead of calling getUserMedia().
+  // Set back to false before publishing.
+  const DEMO_MODE = true;
+
   const video = document.getElementById('frame-video');
   let stream = null;
   let port = null;
@@ -14,10 +20,82 @@
   let micStream = null;
   let micStartPromise = null;
   let micStopRequested = false;
+  let demoRafId = null;
 
   function reply(message) {
     if (!port) return;
     port.postMessage(message);
+  }
+
+  // TEMP DEV ASSETS — sample stills swapped in for camera-less screenshots.
+  // Not meant to ship: remove alongside DEMO_MODE before publishing.
+  const DEMO_IMAGE_SRCS = ['demo-sample-1.jpg', 'demo-sample-2.jpg'];
+  const DEMO_SWAP_INTERVAL_MS = 4000;
+
+  function loadDemoImages() {
+    return Promise.all(
+      DEMO_IMAGE_SRCS.map(
+        (src) =>
+          new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(null);
+            img.src = src;
+          })
+      )
+    );
+  }
+
+  // Scales+crops an image to fill the canvas without distortion — the same
+  // effect as the live preview's CSS `object-fit: cover`.
+  function drawImageCover(ctx, img, width, height) {
+    const imageRatio = img.width / img.height;
+    const canvasRatio = width / height;
+    let drawWidth = width;
+    let drawHeight = height;
+    if (imageRatio > canvasRatio) {
+      drawHeight = height;
+      drawWidth = height * imageRatio;
+    } else {
+      drawWidth = width;
+      drawHeight = width / imageRatio;
+    }
+    const offsetX = (width - drawWidth) / 2;
+    // Anchored to the top (not centered) when cropping vertically — these are
+    // headshot-style photos, so trimming from the bottom keeps the face in
+    // frame instead of cutting through it at small preview sizes.
+    const offsetY = 0;
+    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+  }
+
+  function startDemoStream() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 480;
+    const ctx = canvas.getContext('2d');
+    let images = [];
+    let activeIndex = 0;
+    let lastSwap = 0;
+
+    function draw(now) {
+      if (images.length) {
+        if (!lastSwap) lastSwap = now;
+        if (now - lastSwap >= DEMO_SWAP_INTERVAL_MS) {
+          activeIndex = (activeIndex + 1) % images.length;
+          lastSwap = now;
+        }
+        const img = images[activeIndex];
+        if (img) drawImageCover(ctx, img, canvas.width, canvas.height);
+      }
+      demoRafId = requestAnimationFrame(draw);
+    }
+    demoRafId = requestAnimationFrame(draw);
+
+    loadDemoImages().then((loaded) => {
+      images = loaded.filter(Boolean);
+    });
+
+    return canvas.captureStream(30);
   }
 
   // Some sites send a Permissions-Policy header that locks camera/mic out of
@@ -79,6 +157,14 @@
       reply({ type: 'GLIMP_STARTED' });
       return;
     }
+
+    if (DEMO_MODE) {
+      stream = startDemoStream();
+      video.srcObject = stream;
+      reply({ type: 'GLIMP_STARTED' });
+      return;
+    }
+
     // A getUserMedia negotiation is already in flight (e.g. the prewarm on
     // Cmd/Ctrl+Shift, followed moments later by the real start on L) — let
     // that one finish rather than opening a second, independent stream that
@@ -125,6 +211,10 @@
     // attached to a camera that's about to die.
     stopRecording();
     stopMic();
+    if (demoRafId) {
+      cancelAnimationFrame(demoRafId);
+      demoRafId = null;
+    }
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
       stream = null;

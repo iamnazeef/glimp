@@ -2,8 +2,7 @@
   "manifest_version": 3,
   "name": "Glimp - Quick Camera",
   "version": "1.0.0",
-  "description": "Hold a keyboard shortcut to open a smooth camera preview on top of any page.",
-  "permissions": ["activeTab", "tabs"],
+  "description": "Hold a shortcut to open a floating camera preview anywhere. Snap photos, record video with sound, and pin it open.",
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"
@@ -24,12 +23,17 @@
     }
   ],
   "icons": {
-    "16": "icon.png",
-    "48": "icon.png",
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
     "128": "icon.png"
   },
   "action": {
     "default_title": "Glimp Camera",
-    "default_icon": "icon.png"
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png"
+    }
   }
 }
