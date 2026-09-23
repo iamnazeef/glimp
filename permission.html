@@ -11,21 +11,91 @@
       box-sizing: border-box;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
       min-height: 100vh;
       background: #0a0a0f;
       color: #fff;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
+      gap: 80px;
       padding: 40px 20px;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: 150px;
+      flex-shrink: 0;
+      padding-top: 14px;
+    }
+
+    .sidebar-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #52525b;
+      margin-bottom: 10px;
+      padding: 0 12px;
+    }
+
+    .sidebar-link {
+      display: block;
+      padding: 8px 12px;
+      border-radius: 8px;
+      color: #a1a1aa;
+      text-decoration: none;
+      font-size: 14px;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .sidebar-link:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
     }
 
     .container {
       max-width: 560px;
       text-align: center;
       animation: fadeIn 0.6s ease-out;
+    }
+
+    section[id] {
+      scroll-margin-top: 24px;
+    }
+
+    @media (max-width: 860px) {
+      body {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .sidebar {
+        position: static;
+        flex-direction: row;
+        width: 100%;
+        max-width: 560px;
+        overflow-x: auto;
+        padding-top: 0;
+        gap: 4px;
+      }
+
+      .sidebar-title {
+        display: none;
+      }
+
+      .sidebar-link {
+        flex-shrink: 0;
+      }
     }
 
     @keyframes fadeIn {
@@ -245,6 +315,35 @@
       text-align: left;
     }
 
+    .faq-list {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .faq-q {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f4f4f5;
+      margin-bottom: 6px;
+    }
+
+    .faq-a {
+      font-size: 14px;
+      color: #a1a1aa;
+      line-height: 1.6;
+    }
+
+    .faq-a code {
+      font-family: inherit;
+      background: #18181b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 13px;
+      color: #d4d4d8;
+    }
+
     .help-title {
       font-size: 13px;
       text-transform: uppercase;
@@ -323,18 +422,29 @@
   </style>
 </head>
 <body>
+  <nav class="sidebar">
+    <div class="sidebar-title">Jump to</div>
+    <a class="sidebar-link" href="#overview">Overview</a>
+    <a class="sidebar-link" href="#try-it">Try it</a>
+    <a class="sidebar-link" href="#features">Features</a>
+    <a class="sidebar-link" href="#shortcuts">Shortcuts</a>
+    <a class="sidebar-link" href="#faq">FAQ</a>
+  </nav>
   <div class="container">
-    <div class="logo">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-      </svg>
-    </div>
+    <section id="overview">
+      <div class="logo">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+      </div>
 
-    <h1>Glimp</h1>
-    <p class="tagline">
-      A tiny camera preview that floats above any page. Hold your shortcut, glance at yourself, and release to tuck it away.
-    </p>
+      <h1>Glimp</h1>
+      <p class="tagline">
+        A tiny camera preview that floats above any page. Hold your shortcut, glance at yourself, and release to tuck it away.
+      </p>
+    </section>
 
+    <section id="try-it">
     <div class="shortcut-card">
       <div class="shortcut-label">Your shortcut</div>
       <div class="keys">
@@ -369,7 +479,9 @@
         This page lets you test the camera. The first time you use the shortcut on a website, Chrome will ask for camera access for that site. Choose <strong>Allow while visiting the site</strong> so it persists for that site. The test button below does not grant permission for other websites.
       </p>
     </div>
+    </section>
 
+    <section id="features">
     <div class="features">
       <div class="feature">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -397,7 +509,9 @@
         Press Enter to snap a photo
       </div>
     </div>
+    </section>
 
+    <section id="shortcuts">
     <div class="help-card">
       <div class="help-title">All shortcuts</div>
       <ul class="shortcut-list">
@@ -447,6 +561,31 @@
         </li>
       </ul>
     </div>
+    </section>
+
+    <section id="faq">
+    <div class="help-card">
+      <div class="help-title">Permissions FAQ</div>
+      <div class="faq-list">
+        <div>
+          <div class="faq-q">Why do I only have to grant camera access once?</div>
+          <div class="faq-a">Glimp asks for camera access from its own extension page, not from each website you visit. Chrome ties the permission to that one page, so granting it here covers every site afterward — no per-site prompts.</div>
+        </div>
+        <div>
+          <div class="faq-q">Is that safe?</div>
+          <div class="faq-a">It's a deliberate trade-off. Since the permission is shared everywhere, any site could in theory reuse it silently instead of asking again. Nothing you capture is ever sent anywhere — photos and videos are saved straight to your downloads and never leave your browser.</div>
+        </div>
+        <div>
+          <div class="faq-q">The shortcut isn't opening the camera on a specific site — why?</div>
+          <div class="faq-a">Some sites configure their servers to block camera and microphone access for everything embedded in the page, including extensions. When that happens, Glimp closes quietly instead of showing an error — it's a restriction set by that site, not something granting permission again can fix.</div>
+        </div>
+        <div>
+          <div class="faq-q">How do I revoke access later?</div>
+          <div class="faq-a">Open <code>chrome://settings/content/camera</code> (and the microphone equivalent) and remove the Glimp extension's entry, or remove the extension entirely from <code>chrome://extensions</code>.</div>
+        </div>
+      </div>
+    </div>
+    </section>
   </div>
 
   <script src="permission.js"></script>

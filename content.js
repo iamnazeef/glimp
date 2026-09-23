@@ -167,6 +167,14 @@
         openPermissionPage();
       }
       hideOverlay(true);
+    } else if (data.type === 'GLIMP_POLICY_BLOCKED') {
+      // This site's own Permissions-Policy header locks the feature out of
+      // every embedded context — granting it again on the extension's own
+      // permission page can't fix a restriction set by this site's server,
+      // so don't send the user there; just back out quietly.
+      cameraActive = false;
+      console.error(`Glimp: ${data.feature} is blocked by this site's Permissions-Policy — this can't be fixed from the extension.`);
+      hideOverlay(true);
     } else if (data.type === 'GLIMP_CAPTURED') {
       downloadBlob(data.blob, 'png');
     } else if (data.type === 'GLIMP_RECORDING_STOPPED') {

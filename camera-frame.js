@@ -20,6 +20,15 @@
     port.postMessage(message);
   }
 
+  // Some sites send a Permissions-Policy header that locks camera/mic out of
+  // every embedded context (own iframes included) — no `allow` attribute on
+  // our iframe can override that, it's the top-level document's own header.
+  // Checking this first avoids both a guaranteed-to-fail getUserMedia() call
+  // and the "Permissions policy violation" console spam that comes with it.
+  function isFeaturePolicyBlocked(feature) {
+    return !!(document.featurePolicy && !document.featurePolicy.allowsFeature(feature));
+  }
+
   // Mic hardware has a real ramp-up delay after getUserMedia resolves — audio
   // requested only once R is pressed lands a beat or two of silence at the
   // start of every recording. Acquiring it as soon as the camera itself
@@ -28,6 +37,7 @@
   function prewarmMic() {
     if (micStream) return Promise.resolve(micStream);
     if (micStartPromise) return micStartPromise;
+    if (isFeaturePolicyBlocked('microphone')) return Promise.resolve(null);
 
     micStopRequested = false;
     micStartPromise = navigator.mediaDevices
@@ -74,6 +84,11 @@
     // that one finish rather than opening a second, independent stream that
     // nothing would ever stop.
     if (starting) return;
+
+    if (isFeaturePolicyBlocked('camera')) {
+      reply({ type: 'GLIMP_POLICY_BLOCKED', feature: 'camera' });
+      return;
+    }
 
     starting = true;
     stopRequested = false;
